@@ -1,236 +1,135 @@
 <?php
 /**
- * SneakVault CMS - Individual Sneaker Page
+ * SneakVault CMS - All Sneakers Page
  * 
- * Displays detailed information about a single sneaker with comments.
+ * Displays all sneakers with filtering and pagination.
  * 
  * Requirements Met:
- * - 2.7: Navigate pages (5%)
- * - 2.9: Comment on pages with one-to-many relationship (5%)
- * - 2.10: CAPTCHA verification for comments (5%)
- * - 4.2: Sanitize numeric IDs (1%)
- * - 4.3: Sanitize string inputs (1%)
- * - 6.4: Display images (2%)
+ * - 2.7: Navigate pages via list (5%)
+ * - 6.4: View images on pages (2%)
  */
 
 require('connect.php');
-session_start();
 
-// Validate and sanitize ID
-$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-if (!$id) {
-    header("Location: index.php");
-    exit;
+// Get filter parameters
+$filter_category = filter_input(INPUT_GET, 'category', FILTER_VALIDATE_INT);
+$filter_brand = filter_input(INPUT_GET, 'brand', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+// Pagination setup
+$page = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT) ?? 1;
+$page = max(1, $page);
+$per_page = 12;
+$offset = ($page - 1) * $per_page;
+
+// Build query based on filters
+$where_conditions = [];
+$params = [];
+
+if ($filter_category) {
+    $where_conditions[] = "s.category_id = :category_id";
+    $params[':category_id'] = $filter_category;
 }
 
-// Fetch sneaker details
-$query = "SELECT s.*, c.name as category_name, c.id as category_id
-          FROM sneakers s 
-          LEFT JOIN categories c ON s.category_id = c.id 
-          WHERE s.id = :id";
-$statement = $db->prepare($query);
-$statement->bindValue(':id', $id, PDO::PARAM_INT);
-$statement->execute();
-$sneaker = $statement->fetch(PDO::FETCH_ASSOC);
-
-if (!$sneaker) {
-    header("Location: index.php");
-    exit;
+if ($filter_brand) {
+    $where_conditions[] = "s.brand = :brand";
+    $params[':brand'] = $filter_brand;
 }
 
-// Fetch comments (only non-moderated)
-$comments_query = "SELECT c.*, u.username 
-                   FROM comments c 
-                   LEFT JOIN users u ON c.user_id = u.id 
-                   WHERE c.sneaker_id = :id AND c.is_moderated = 0
-                   ORDER BY c.created_at DESC";
-$comments_stmt = $db->prepare($comments_query);
-$comments_stmt->bindValue(':id', $id, PDO::PARAM_INT);
-$comments_stmt->execute();
-$comments = $comments_stmt->fetchAll(PDO::FETCH_ASSOC);
+$where_clause = '';
+if (count($where_conditions) > 0) {
+    $where_clause = 'WHERE ' . implode(' AND ', $where_conditions);
+}
 
-// Handle comment submission
-$comment_error = '';
-$comment_success = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_comment'])) {
-    // Verify CAPTCHA
-    if (!isset($_SESSION['captcha']) || !isset($_POST['captcha']) || 
-        strtoupper($_POST['captcha']) !== $_SESSION['captcha']) {
-        $comment_error = "Invalid CAPTCHA code. Please try again.";
+// Get total count
+$count_query = "SELECT COUNT(*) FROM sneakers s $where_clause";
+$count_stmt = $db->prepare($count_query);
+foreach ($params as $key => $value) {
+    if ($key === ':category_id') {
+        $count_stmt->bindValue($key, $value, PDO::PARAM_INT);
     } else {
-        // Sanitize inputs
-        $author_name = isset($_SESSION['username']) 
-            ? $_SESSION['username'] 
-            : filter_input(INPUT_POST, 'author_name', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $content = filter_input(INPUT_POST, 'content', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $user_id = $_SESSION['user_id'] ?? null;
-        
-        // Validation
-        if (empty($author_name)) {
-            $comment_error = "Name is required.";
-        } elseif (empty($content)) {
-            $comment_error = "Comment content is required.";
-        } elseif (strlen($content) < 10) {
-            $comment_error = "Comment must be at least 10 characters long.";
-        } else {
-            // Insert comment
-            $insert_query = "INSERT INTO comments (sneaker_id, user_id, author_name, content) 
-                            VALUES (:sneaker_id, :user_id, :author_name, :content)";
-            $insert_stmt = $db->prepare($insert_query);
-            $insert_stmt->bindValue(':sneaker_id', $id, PDO::PARAM_INT);
-            $insert_stmt->bindValue(':user_id', $user_id, PDO::PARAM_INT);
-            $insert_stmt->bindValue(':author_name', $author_name);
-            $insert_stmt->bindValue(':content', $content);
-            
-            if ($insert_stmt->execute()) {
-                $comment_success = "Comment submitted successfully!";
-                unset($_SESSION['captcha']);
-                
-                // Refresh page to show new comment
-                header("Location: sneaker.php?id=$id&commented=1");
-                exit;
-            } else {
-                $comment_error = "Failed to submit comment. Please try again.";
-            }
-        }
+        $count_stmt->bindValue($key, $value);
     }
 }
+$count_stmt->execute();
+$total_sneakers = $count_stmt->fetchColumn();
+$total_pages = ceil($total_sneakers / $per_page);
 
-// Check for success message after redirect
-if (isset($_GET['commented']) && $_GET['commented'] == '1') {
-    $comment_success = "Your comment has been posted successfully!";
+// Fetch sneakers
+$query = "SELECT s.*, c.name as category_name 
+          FROM sneakers s 
+          LEFT JOIN categories c ON s.category_id = c.id 
+          $where_clause
+          ORDER BY s.created_at DESC 
+          LIMIT :limit OFFSET :offset";
+$statement = $db->prepare($query);
+
+foreach ($params as $key => $value) {
+    if ($key === ':category_id') {
+        $statement->bindValue($key, $value, PDO::PARAM_INT);
+    } else {
+        $statement->bindValue($key, $value);
+    }
 }
+$statement->bindValue(':limit', $per_page, PDO::PARAM_INT);
+$statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+$statement->execute();
+$sneakers = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch all categories for filter dropdown
+$cat_query = "SELECT * FROM categories ORDER BY name ASC";
+$categories = $db->query($cat_query)->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch unique brands for filter
+$brand_query = "SELECT DISTINCT brand FROM sneakers ORDER BY brand ASC";
+$brands = $db->query($brand_query)->fetchAll(PDO::FETCH_COLUMN);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($sneaker['name']) ?> - SneakVault</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <meta name="description" content="Browse all sneakers at SneakVault">
+    <title>All Sneakers - SneakVault</title>
+    <link rel="stylesheet" href="css/style.css">
     <style>
-        .sneaker-detail {
-            margin: 2rem 0;
-        }
-        
-        .sneaker-header {
+        .page-header {
             text-align: center;
             padding: 2rem 0;
             border-bottom: 2px solid var(--border-color);
             margin-bottom: 2rem;
         }
         
-        .sneaker-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 3rem;
-            margin-bottom: 3rem;
-        }
-        
-        .sneaker-image img {
-            width: 100%;
+        .filters {
+            background: white;
+            padding: 1.5rem;
             border-radius: var(--radius-md);
-            box-shadow: var(--shadow-lg);
-        }
-        
-        .sneaker-info-box {
-            background-color: var(--bg-light);
-            padding: 2rem;
-            border-radius: var(--radius-md);
-        }
-        
-        .info-row {
-            display: grid;
-            grid-template-columns: 150px 1fr;
-            gap: 1rem;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .info-row:last-child {
-            border-bottom: none;
-        }
-        
-        .info-label {
-            font-weight: 600;
-            color: var(--text-light);
-        }
-        
-        .info-value {
-            color: var(--text-color);
-        }
-        
-        .sneaker-description {
-            padding: 2rem;
-            background-color: white;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
             margin-bottom: 2rem;
         }
         
-        .comments-section {
-            margin-top: 3rem;
-            padding: 2rem;
-            background-color: var(--bg-light);
-            border-radius: var(--radius-md);
-        }
-        
-        .comment-form {
-            background-color: white;
-            padding: 2rem;
-            border-radius: var(--radius-md);
-            margin-bottom: 2rem;
-        }
-        
-        .captcha-group {
+        .filters-form {
             display: grid;
-            grid-template-columns: auto 1fr;
+            grid-template-columns: 1fr 1fr auto;
             gap: 1rem;
+            align-items: end;
+        }
+        
+        .results-info {
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-        }
-        
-        .captcha-group img {
-            border: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: var(--bg-light);
             border-radius: var(--radius-sm);
         }
         
-        .comment {
-            background-color: white;
-            padding: 1.5rem;
-            border-radius: var(--radius-md);
-            margin-bottom: 1rem;
-            border-left: 3px solid var(--accent-color);
-        }
-        
-        .comment-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 1rem;
-            color: var(--text-light);
-        }
-        
-        .comment-author {
-            font-weight: 600;
-            color: var(--primary-color);
-        }
-        
-        .comment-date {
-            font-size: 0.9rem;
-            font-style: italic;
+        .clear-filters {
+            margin-left: 0.5rem;
         }
         
         @media (max-width: 768px) {
-            .sneaker-content {
-                grid-template-columns: 1fr;
-            }
-            
-            .info-row {
-                grid-template-columns: 1fr;
-                gap: 0.25rem;
-            }
-            
-            .captcha-group {
+            .filters-form {
                 grid-template-columns: 1fr;
             }
         }
@@ -240,168 +139,141 @@ if (isset($_GET['commented']) && $_GET['commented'] == '1') {
     <?php include('includes/header.php'); ?>
     
     <main class="container">
-        <article class="sneaker-detail">
-            <!-- Sneaker Header -->
-            <div class="sneaker-header">
-                <h1><?= htmlspecialchars($sneaker['name']) ?></h1>
-                <p style="font-size: 1.2rem; color: var(--text-light);">
-                    <strong><?= htmlspecialchars($sneaker['brand']) ?></strong>
-                    <?php if($sneaker['colorway']): ?>
-                        | <?= htmlspecialchars($sneaker['colorway']) ?>
-                    <?php endif; ?>
-                </p>
-            </div>
-            
-            <!-- Sneaker Content -->
-            <div class="sneaker-content">
-                <div class="sneaker-image">
-                    <?php if($sneaker['image_path'] && file_exists($sneaker['image_path'])): ?>
-                        <img src="<?= htmlspecialchars($sneaker['image_path']) ?>" 
-                             alt="<?= htmlspecialchars($sneaker['name']) ?>">
-                    <?php else: ?>
-                        <img src="images/placeholder.jpg" alt="No image available">
-                    <?php endif; ?>
-                </div>
-                
-                <div class="sneaker-details">
-                    <div class="sneaker-info-box">
-                        <h2 style="margin-bottom: 1.5rem;">Details</h2>
-                        
-                        <div class="info-row">
-                            <div class="info-label">Brand:</div>
-                            <div class="info-value"><?= htmlspecialchars($sneaker['brand']) ?></div>
-                        </div>
-                        
-                        <?php if($sneaker['colorway']): ?>
-                            <div class="info-row">
-                                <div class="info-label">Colorway:</div>
-                                <div class="info-value"><?= htmlspecialchars($sneaker['colorway']) ?></div>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if($sneaker['release_date']): ?>
-                            <div class="info-row">
-                                <div class="info-label">Release Date:</div>
-                                <div class="info-value"><?= date('F j, Y', strtotime($sneaker['release_date'])) ?></div>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if($sneaker['retail_price']): ?>
-                            <div class="info-row">
-                                <div class="info-label">Retail Price:</div>
-                                <div class="info-value" style="font-size: 1.3rem; font-weight: 700; color: var(--secondary-color);">
-                                    $<?= number_format($sneaker['retail_price'], 2) ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if($sneaker['sku']): ?>
-                            <div class="info-row">
-                                <div class="info-label">SKU:</div>
-                                <div class="info-value"><code><?= htmlspecialchars($sneaker['sku']) ?></code></div>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <div class="info-row">
-                            <div class="info-label">Category:</div>
-                            <div class="info-value">
-                                <a href="category.php?id=<?= $sneaker['category_id'] ?>">
-                                    <?= htmlspecialchars($sneaker['category_name']) ?>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Description -->
-            <div class="sneaker-description">
-                <h2>Description</h2>
-                <p><?= nl2br(htmlspecialchars($sneaker['description'])) ?></p>
-            </div>
-            
-            <!-- Comments Section -->
-            <div class="comments-section">
-                <h2>Comments (<?= count($comments) ?>)</h2>
-                
-                <?php if($comment_error): ?>
-                    <div class="alert alert-error"><?= htmlspecialchars($comment_error) ?></div>
-                <?php endif; ?>
-                
-                <?php if($comment_success): ?>
-                    <div class="alert alert-success"><?= htmlspecialchars($comment_success) ?></div>
-                <?php endif; ?>
-                
-                <!-- Comment Form -->
-                <form method="post" action="" class="comment-form">
-                    <h3>Leave a Comment</h3>
-                    
-                    <?php if(!isset($_SESSION['user_id'])): ?>
-                        <div class="form-group">
-                            <label for="author_name">Name: <span class="required">*</span></label>
-                            <input type="text" 
-                                   id="author_name" 
-                                   name="author_name" 
-                                   required
-                                   value="<?= isset($_POST['author_name']) ? htmlspecialchars($_POST['author_name']) : '' ?>">
-                        </div>
-                    <?php endif; ?>
-                    
-                    <div class="form-group">
-                        <label for="content">Comment: <span class="required">*</span></label>
-                        <textarea id="content" 
-                                  name="content" 
-                                  rows="4" 
-                                  required
-                                  minlength="10"
-                                  placeholder="Share your thoughts about this sneaker..."><?= isset($_POST['content']) ? htmlspecialchars($_POST['content']) : '' ?></textarea>
-                        <small>Minimum 10 characters</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="captcha">Security Check: <span class="required">*</span></label>
-                        <div class="captcha-group">
-                            <img src="captcha.php?<?= time() ?>" alt="CAPTCHA" style="max-width: 200px;">
-                            <input type="text" 
-                                   id="captcha" 
-                                   name="captcha" 
-                                   required
-                                   placeholder="Enter the code shown"
-                                   autocomplete="off">
-                        </div>
-                        <small>Enter the code from the image above</small>
-                    </div>
-                    
-                    <button type="submit" name="submit_comment" class="btn btn-primary">Submit Comment</button>
-                </form>
-                
-                <!-- Comments List -->
-                <?php if(count($comments) > 0): ?>
-                    <div class="comments-list">
-                        <h3 style="margin-bottom: 1rem;">All Comments</h3>
-                        <?php foreach($comments as $comment): ?>
-                            <article class="comment">
-                                <div class="comment-header">
-                                    <span class="comment-author">
-                                        <?= htmlspecialchars($comment['author_name']) ?>
-                                    </span>
-                                    <span class="comment-date">
-                                        <?= date('M j, Y \a\t g:i A', strtotime($comment['created_at'])) ?>
-                                    </span>
-                                </div>
-                                <div class="comment-content">
-                                    <?= nl2br(htmlspecialchars($comment['content'])) ?>
-                                </div>
-                            </article>
+        <!-- Page Header -->
+        <header class="page-header">
+            <h1>All Sneakers</h1>
+            <p>Browse our complete collection of sneakers</p>
+        </header>
+        
+        <!-- Filters -->
+        <div class="filters">
+            <form method="get" action="" class="filters-form">
+                <div class="form-group" style="margin: 0;">
+                    <label for="category">Filter by Category:</label>
+                    <select id="category" name="category">
+                        <option value="">All Categories</option>
+                        <?php foreach($categories as $category): ?>
+                            <option value="<?= $category['id'] ?>" 
+                                <?= ($filter_category == $category['id']) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($category['name']) ?>
+                            </option>
                         <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <p style="text-align: center; color: var(--text-light); padding: 2rem;">
-                        No comments yet. Be the first to share your thoughts!
-                    </p>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin: 0;">
+                    <label for="brand">Filter by Brand:</label>
+                    <select id="brand" name="brand">
+                        <option value="">All Brands</option>
+                        <?php foreach($brands as $brand): ?>
+                            <option value="<?= htmlspecialchars($brand) ?>" 
+                                <?= ($filter_brand === $brand) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($brand) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    <?php if($filter_category || $filter_brand): ?>
+                        <a href="sneakers.php" class="btn btn-secondary">Clear</a>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Results Info -->
+        <div class="results-info">
+            <div>
+                <strong><?= $total_sneakers ?></strong> 
+                <?= $total_sneakers === 1 ? 'sneaker' : 'sneakers' ?> found
+                <?php if($filter_category || $filter_brand): ?>
+                    <span style="color: var(--text-light);">
+                        (filtered)
+                    </span>
                 <?php endif; ?>
             </div>
-        </article>
+            <div>
+                <?php if($page > 1): ?>
+                    <span style="color: var(--text-light);">
+                        Showing <?= $offset + 1 ?>-<?= min($offset + $per_page, $total_sneakers) ?> of <?= $total_sneakers ?>
+                    </span>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <!-- Sneakers Grid -->
+        <?php if(count($sneakers) > 0): ?>
+            <section class="grid grid-3">
+                <?php foreach($sneakers as $sneaker): ?>
+                    <article class="card">
+                        <a href="sneaker.php?id=<?= $sneaker['id'] ?>">
+                            <?php if($sneaker['image_path'] && file_exists($sneaker['image_path'])): ?>
+                                <img src="<?= htmlspecialchars($sneaker['image_path']) ?>" 
+                                     alt="<?= htmlspecialchars($sneaker['name']) ?>" 
+                                     class="card-image">
+                            <?php else: ?>
+                                <img src="images/placeholder.jpg" 
+                                     alt="No image available" 
+                                     class="card-image">
+                            <?php endif; ?>
+                            
+                            <div class="card-body">
+                                <h3 class="card-title"><?= htmlspecialchars($sneaker['name']) ?></h3>
+                                
+                                <p class="card-text">
+                                    <strong><?= htmlspecialchars($sneaker['brand']) ?></strong>
+                                    <?php if($sneaker['colorway']): ?>
+                                        <br>
+                                        <em><?= htmlspecialchars($sneaker['colorway']) ?></em>
+                                    <?php endif; ?>
+                                </p>
+                                
+                                <?php if($sneaker['category_name']): ?>
+                                    <span class="badge"><?= htmlspecialchars($sneaker['category_name']) ?></span>
+                                <?php endif; ?>
+                                
+                                <?php if($sneaker['retail_price']): ?>
+                                    <p class="card-text mt-1">
+                                        <strong style="color: var(--secondary-color); font-size: 1.2rem;">
+                                            $<?= number_format($sneaker['retail_price'], 2) ?>
+                                        </strong>
+                                    </p>
+                                <?php endif; ?>
+                            </div>
+                        </a>
+                    </article>
+                <?php endforeach; ?>
+            </section>
+            
+            <!-- Pagination -->
+            <?php if($total_pages > 1): ?>
+                <nav class="pagination">
+                    <?php if($page > 1): ?>
+                        <?php
+                        $prev_params = http_build_query(array_merge($_GET, ['page' => $page - 1]));
+                        ?>
+                        <a href="?<?= $prev_params ?>" class="btn btn-secondary">← Previous</a>
+                    <?php endif; ?>
+                    
+                    <span class="page-info">Page <?= $page ?> of <?= $total_pages ?></span>
+                    
+                    <?php if($page < $total_pages): ?>
+                        <?php
+                        $next_params = http_build_query(array_merge($_GET, ['page' => $page + 1]));
+                        ?>
+                        <a href="?<?= $next_params ?>" class="btn btn-secondary">Next →</a>
+                    <?php endif; ?>
+                </nav>
+            <?php endif; ?>
+            
+        <?php else: ?>
+            <div class="no-results">
+                <p>No sneakers found matching your criteria.</p>
+                <p><a href="sneakers.php" class="btn btn-primary">View All Sneakers</a></p>
+            </div>
+        <?php endif; ?>
     </main>
     
     <?php include('includes/footer.php'); ?>
