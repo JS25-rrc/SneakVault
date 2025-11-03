@@ -1,14 +1,4 @@
 <?php
-/**
- * SneakVault CMS - All Sneakers Page
- * 
- * Displays all sneakers with filtering and pagination.
- * 
- * Requirements Met:
- * - 2.7: Navigate pages via list (5%)
- * - 6.4: View images on pages (2%)
- */
-
 require('connect.php');
 
 // Get filter parameters
@@ -90,7 +80,7 @@ $brands = $db->query($brand_query)->fetchAll(PDO::FETCH_COLUMN);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Browse all sneakers at SneakVault">
     <title>All Sneakers - SneakVault</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/styles.css">
     <style>
         .page-header {
             text-align: center;

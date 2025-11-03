@@ -1,13 +1,4 @@
 <?php
-/**
- * SneakVault CMS - Database Connection
- * 
- * This file establishes a PDO connection to the MySQL database.
- * PDO is required by the project specifications (NOT mysqli).
- * 
- * Database credentials are provided by the course instructor.
- */
-
 // Database configuration constants
 define('DB_DSN', 'mysql:host=localhost;dbname=serverside;charset=utf8');
 define('DB_USER', 'serveruser');

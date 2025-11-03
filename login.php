@@ -1,14 +1,4 @@
 <?php
-/**
- * SneakVault CMS - Login Page
- * 
- * Allows users to log in with username and password.
- * 
- * Requirements Met:
- * - 7.4: Login functionality with username/password (5%)
- * - 7.3: Support for hashed passwords (2%)
- */
-
 require('connect.php');
 session_start();
 

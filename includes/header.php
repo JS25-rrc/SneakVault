@@ -1,28 +1,17 @@
 <?php
-/**
- * SneakVault CMS - Site Header
- * 
- * This file contains the site header with navigation menu.
- * It is included on all public pages.
- * 
- * Requirements Met:
- * - 2.7: Navigate pages via menu
- * - 2.8: Navigate by categories
- */
+    // Start session if not already started
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+    // Fetch categories for navigation dropdown
+    $cat_query = "SELECT * FROM categories ORDER BY name ASC";
+    $cat_stmt = $db->prepare($cat_query);
+    $cat_stmt->execute();
+    $categories = $cat_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch categories for navigation dropdown
-$cat_query = "SELECT * FROM categories ORDER BY name ASC";
-$cat_stmt = $db->prepare($cat_query);
-$cat_stmt->execute();
-$categories = $cat_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Get current page for active menu highlighting
-$current_page = basename($_SERVER['PHP_SELF']);
+    // Get current page for active menu highlighting
+    $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <header class="site-header">
     <div class="container">
@@ -50,7 +39,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     </li>
                     
                     <li class="dropdown">
-                        <a href="#" class="dropdown-toggle">Categories ▼</a>
+                        <a href="#" class="dropdown-toggle" onclick="return false;">Categories</a>
                         <ul class="dropdown-menu">
                             <?php foreach($categories as $category): ?>
                                 <li>

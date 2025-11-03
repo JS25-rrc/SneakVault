@@ -1,53 +1,43 @@
 <?php
-/**
- * SneakVault CMS - Admin Dashboard
- * 
- * Main admin page showing all sneakers with sorting options.
- * 
- * Requirements Met:
- * - 2.3: View list sorted by title, created_at, updated_at (5%)
- * - 7.1: Only admins can perform admin tasks (2%)
- */
+    require('../connect.php');
+    session_start();
 
-require('../connect.php');
-session_start();
+    // Check if user is admin
+    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+        header("Location: ../login.php");
+        exit;
+    }
 
-// Check if user is admin
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-    header("Location: ../login.php");
-    exit;
-}
+    // Get and validate sort parameter
+    $sort_by = filter_input(INPUT_GET, 'sort', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? 'created_at';
+    $allowed_sorts = ['name', 'created_at', 'updated_at'];
+    $sort_column = in_array($sort_by, $allowed_sorts) ? $sort_by : 'created_at';
 
-// Get and validate sort parameter
-$sort_by = filter_input(INPUT_GET, 'sort', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? 'created_at';
-$allowed_sorts = ['name', 'created_at', 'updated_at'];
-$sort_column = in_array($sort_by, $allowed_sorts) ? $sort_by : 'created_at';
+    // Fetch all sneakers with sorting
+    $query = "SELECT s.*, c.name as category_name 
+            FROM sneakers s 
+            LEFT JOIN categories c ON s.category_id = c.id 
+            ORDER BY s.$sort_column DESC";
+    $statement = $db->prepare($query);
+    $statement->execute();
+    $sneakers = $statement->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch all sneakers with sorting
-$query = "SELECT s.*, c.name as category_name 
-          FROM sneakers s 
-          LEFT JOIN categories c ON s.category_id = c.id 
-          ORDER BY s.$sort_column DESC";
-$statement = $db->prepare($query);
-$statement->execute();
-$sneakers = $statement->fetchAll(PDO::FETCH_ASSOC);
+    // Get statistics for dashboard
+    $total_sneakers = count($sneakers);
+    $total_categories = $db->query("SELECT COUNT(*) FROM categories")->fetchColumn();
+    $total_users = $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
+    $total_comments = $db->query("SELECT COUNT(*) FROM comments")->fetchColumn();
+    $pending_comments = $db->query("SELECT COUNT(*) FROM comments WHERE is_moderated = 0")->fetchColumn();
 
-// Get statistics for dashboard
-$total_sneakers = count($sneakers);
-$total_categories = $db->query("SELECT COUNT(*) FROM categories")->fetchColumn();
-$total_users = $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
-$total_comments = $db->query("SELECT COUNT(*) FROM comments")->fetchColumn();
-$pending_comments = $db->query("SELECT COUNT(*) FROM comments WHERE is_moderated = 0")->fetchColumn();
-
-// Check for success messages
-$success_message = '';
-if (isset($_GET['created'])) {
-    $success_message = "Sneaker created successfully!";
-} elseif (isset($_GET['updated'])) {
-    $success_message = "Sneaker updated successfully!";
-} elseif (isset($_GET['deleted'])) {
-    $success_message = "Sneaker deleted successfully!";
-}
+    // Check for success messages
+    $success_message = '';
+    if (isset($_GET['created'])) {
+        $success_message = "Sneaker created successfully!";
+    } elseif (isset($_GET['updated'])) {
+        $success_message = "Sneaker updated successfully!";
+    } elseif (isset($_GET['deleted'])) {
+        $success_message = "Sneaker deleted successfully!";
+    }
 ?>
 <!DOCTYPE html>
 <html lang="en">

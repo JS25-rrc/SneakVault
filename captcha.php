@@ -1,14 +1,4 @@
 <?php
-    /**
-     * SneakVault CMS - CAPTCHA Generator
-     * 
-     * Generates a CAPTCHA image to prevent spam comments.
-     * Uses PHP GD library to create dynamic images.
-     * 
-     * Requirements Met:
-     * - 2.10: CAPTCHA system using PHP with dynamically generated image (5%)
-     */
-
     session_start();
 
     // Generate random CAPTCHA code (6 characters)

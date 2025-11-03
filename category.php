@@ -1,64 +1,53 @@
 <?php
-/**
- * SneakVault CMS - Category Page
- * 
- * Displays sneakers filtered by category.
- * 
- * Requirements Met:
- * - 2.8: Navigate pages by categories (5%)
- * - 2.4: Categories with 1-to-many relationship (5%)
- * - 4.2: Sanitize numeric IDs (1%)
- */
+    require('connect.php');
 
-require('connect.php');
+    // Validate and sanitize category ID
+    $category_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 
-// Validate and sanitize category ID
-$category_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+    if (!$category_id) {
+        header("Location: index.php");
+        exit;
+    }
 
-if (!$category_id) {
-    header("Location: index.php");
-    exit;
-}
+    // Fetch category details
+    $cat_query = "SELECT * FROM categories WHERE id = :id";
+    $cat_stmt = $db->prepare($cat_query);
+    $cat_stmt->bindValue(':id', $category_id, PDO::PARAM_INT);
+    $cat_stmt->execute();
+    $category = $cat_stmt->fetch(PDO::FETCH_ASSOC);
 
-// Fetch category details
-$cat_query = "SELECT * FROM categories WHERE id = :id";
-$cat_stmt = $db->prepare($cat_query);
-$cat_stmt->bindValue(':id', $category_id, PDO::PARAM_INT);
-$cat_stmt->execute();
-$category = $cat_stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$category) {
+        header("Location: index.php");
+        exit;
+    }
 
-if (!$category) {
-    header("Location: index.php");
-    exit;
-}
+    // Pagination setup
+    $page = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT) ?? 1;
+    $page = max(1, $page);
+    $per_page = 12;
+    $offset = ($page - 1) * $per_page;
 
-// Pagination setup
-$page = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT) ?? 1;
-$page = max(1, $page);
-$per_page = 12;
-$offset = ($page - 1) * $per_page;
+    // Get total count for this category
+    $count_query = "SELECT COUNT(*) FROM sneakers WHERE category_id = :category_id";
+    $count_stmt = $db->prepare($count_query);
+    $count_stmt->bindValue(':category_id', $category_id, PDO::PARAM_INT);
+    $count_stmt->execute();
+    $total_sneakers = $count_stmt->fetchColumn();
+    $total_pages = ceil($total_sneakers / $per_page);
 
-// Get total count for this category
-$count_query = "SELECT COUNT(*) FROM sneakers WHERE category_id = :category_id";
-$count_stmt = $db->prepare($count_query);
-$count_stmt->bindValue(':category_id', $category_id, PDO::PARAM_INT);
-$count_stmt->execute();
-$total_sneakers = $count_stmt->fetchColumn();
-$total_pages = ceil($total_sneakers / $per_page);
-
-// Fetch sneakers in this category
-$query = "SELECT s.*, c.name as category_name 
-          FROM sneakers s 
-          LEFT JOIN categories c ON s.category_id = c.id 
-          WHERE s.category_id = :category_id
-          ORDER BY s.created_at DESC 
-          LIMIT :limit OFFSET :offset";
-$statement = $db->prepare($query);
-$statement->bindValue(':category_id', $category_id, PDO::PARAM_INT);
-$statement->bindValue(':limit', $per_page, PDO::PARAM_INT);
-$statement->bindValue(':offset', $offset, PDO::PARAM_INT);
-$statement->execute();
-$sneakers = $statement->fetchAll(PDO::FETCH_ASSOC);
+    // Fetch sneakers in this category
+    $query = "SELECT s.*, c.name as category_name 
+            FROM sneakers s 
+            LEFT JOIN categories c ON s.category_id = c.id 
+            WHERE s.category_id = :category_id
+            ORDER BY s.created_at DESC 
+            LIMIT :limit OFFSET :offset";
+    $statement = $db->prepare($query);
+    $statement->bindValue(':category_id', $category_id, PDO::PARAM_INT);
+    $statement->bindValue(':limit', $per_page, PDO::PARAM_INT);
+    $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $statement->execute();
+    $sneakers = $statement->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -67,7 +56,7 @@ $sneakers = $statement->fetchAll(PDO::FETCH_ASSOC);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Browse <?= htmlspecialchars($category['name']) ?> sneakers at SneakVault">
     <title><?= htmlspecialchars($category['name']) ?> Sneakers - SneakVault</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/styles.css">
     <style>
         .category-header {
             background: linear-gradient(135deg, var(--primary-color), var(--text-light));

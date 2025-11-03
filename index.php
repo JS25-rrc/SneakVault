@@ -1,14 +1,4 @@
 <?php
-/**
- * SneakVault CMS - Homepage
- * 
- * Displays a grid of sneakers with pagination.
- * 
- * Requirements Met:
- * - 2.7: Navigate pages via menu/list
- * - 6.4: View images on pages
- */
-
 require('connect.php');
 
 // Pagination setup

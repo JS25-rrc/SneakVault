@@ -1,205 +1,191 @@
 <?php
-/**
- * SneakVault CMS - Edit Sneaker Page
- * 
- * Admin form to edit existing sneaker entries.
- * 
- * Requirements Met:
- * - 2.2: Edit/update existing pages (5%)
- * - 2.6: WYSIWYG editor (5%)
- * - 4.1: Validation rules (1%)
- * - 4.2: Sanitize numeric IDs (1%)
- * - 6.2: Remove associated images (5%)
- * - 7.1: Admin-only access (2%)
- */
+    require('../connect.php');
+    session_start();
 
-require('../connect.php');
-session_start();
-
-// Check admin access
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-    header("Location: ../login.php");
-    exit;
-}
-
-// Validate ID
-$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-if (!$id) {
-    header("Location: dashboard.php");
-    exit;
-}
-
-// Fetch categories
-$cat_query = "SELECT * FROM categories ORDER BY name ASC";
-$categories = $db->query($cat_query)->fetchAll(PDO::FETCH_ASSOC);
-
-// Fetch existing sneaker
-$query = "SELECT * FROM sneakers WHERE id = :id";
-$statement = $db->prepare($query);
-$statement->bindValue(':id', $id, PDO::PARAM_INT);
-$statement->execute();
-$sneaker = $statement->fetch(PDO::FETCH_ASSOC);
-
-if (!$sneaker) {
-    header("Location: dashboard.php");
-    exit;
-}
-
-$errors = [];
-$success = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Sanitize inputs
-    $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-    $brand = filter_input(INPUT_POST, 'brand', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-    $colorway = filter_input(INPUT_POST, 'colorway', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-    $release_date = filter_input(INPUT_POST, 'release_date', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-    $retail_price = filter_input(INPUT_POST, 'retail_price', FILTER_VALIDATE_FLOAT);
-    $description = filter_input(INPUT_POST, 'description', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-    $category_id = filter_input(INPUT_POST, 'category_id', FILTER_VALIDATE_INT);
-    $sku = filter_input(INPUT_POST, 'sku', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-    
-    // Validation
-    if (empty($name)) {
-        $errors[] = "Sneaker name is required.";
+    // Check admin access
+    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+        header("Location: ../login.php");
+        exit;
     }
-    if (empty($brand)) {
-        $errors[] = "Brand is required.";
+
+    // Validate ID
+    $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+    if (!$id) {
+        header("Location: dashboard.php");
+        exit;
     }
-    if (empty($description)) {
-        $errors[] = "Description is required.";
+
+    // Fetch categories
+    $cat_query = "SELECT * FROM categories ORDER BY name ASC";
+    $categories = $db->query($cat_query)->fetchAll(PDO::FETCH_ASSOC);
+
+    // Fetch existing sneaker
+    $query = "SELECT * FROM sneakers WHERE id = :id";
+    $statement = $db->prepare($query);
+    $statement->bindValue(':id', $id, PDO::PARAM_INT);
+    $statement->execute();
+    $sneaker = $statement->fetch(PDO::FETCH_ASSOC);
+
+    if (!$sneaker) {
+        header("Location: dashboard.php");
+        exit;
     }
-    if (!$category_id) {
-        $errors[] = "Please select a valid category.";
-    }
-    
-    // Handle image deletion
-    $image_path = $sneaker['image_path'];
-    if (isset($_POST['delete_image']) && $_POST['delete_image'] == '1') {
-        if ($sneaker['image_path'] && file_exists('../' . $sneaker['image_path'])) {
-            unlink('../' . $sneaker['image_path']);
-        }
-        $image_path = null;
-    }
-    
-    // Handle new image upload
-    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-        $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        $file_info = getimagesize($_FILES['image']['tmp_name']);
+
+    $errors = [];
+    $success = '';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // Sanitize inputs
+        $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $brand = filter_input(INPUT_POST, 'brand', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $colorway = filter_input(INPUT_POST, 'colorway', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $release_date = filter_input(INPUT_POST, 'release_date', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $retail_price = filter_input(INPUT_POST, 'retail_price', FILTER_VALIDATE_FLOAT);
+        $description = filter_input(INPUT_POST, 'description', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $category_id = filter_input(INPUT_POST, 'category_id', FILTER_VALIDATE_INT);
+        $sku = filter_input(INPUT_POST, 'sku', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
         
-        if ($file_info && in_array($file_info['mime'], $allowed_types)) {
-            $upload_dir = '../uploads/images/';
-            
-            // Delete old image
+        // Validation
+        if (empty($name)) {
+            $errors[] = "Sneaker name is required.";
+        }
+        if (empty($brand)) {
+            $errors[] = "Brand is required.";
+        }
+        if (empty($description)) {
+            $errors[] = "Description is required.";
+        }
+        if (!$category_id) {
+            $errors[] = "Please select a valid category.";
+        }
+        
+        // Handle image deletion
+        $image_path = $sneaker['image_path'];
+        if (isset($_POST['delete_image']) && $_POST['delete_image'] == '1') {
             if ($sneaker['image_path'] && file_exists('../' . $sneaker['image_path'])) {
                 unlink('../' . $sneaker['image_path']);
             }
-            
-            $extension = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
-            $filename = uniqid('sneaker_') . '.' . $extension;
-            $target_path = $upload_dir . $filename;
-            
-            if (move_uploaded_file($_FILES['image']['tmp_name'], $target_path)) {
-                $image_path = 'uploads/images/' . $filename;
-                resize_image($target_path, 800, 800);
-            } else {
-                $errors[] = "Failed to upload image.";
-            }
-        } else {
-            $errors[] = "Invalid image file.";
+            $image_path = null;
         }
-    }
-    
-    // Update if no errors
-    if (empty($errors)) {
-        $update_query = "UPDATE sneakers SET 
-                        name = :name, 
-                        brand = :brand, 
-                        colorway = :colorway, 
-                        release_date = :release_date, 
-                        retail_price = :retail_price, 
-                        description = :description, 
-                        image_path = :image_path, 
-                        category_id = :category_id, 
-                        sku = :sku 
-                        WHERE id = :id";
-        $update_stmt = $db->prepare($update_query);
-        $update_stmt->bindValue(':name', $name);
-        $update_stmt->bindValue(':brand', $brand);
-        $update_stmt->bindValue(':colorway', $colorway);
-        $update_stmt->bindValue(':release_date', $release_date);
-        $update_stmt->bindValue(':retail_price', $retail_price);
-        $update_stmt->bindValue(':description', $description);
-        $update_stmt->bindValue(':image_path', $image_path);
-        $update_stmt->bindValue(':category_id', $category_id, PDO::PARAM_INT);
-        $update_stmt->bindValue(':sku', $sku);
-        $update_stmt->bindValue(':id', $id, PDO::PARAM_INT);
         
-        if ($update_stmt->execute()) {
-            header("Location: dashboard.php?updated=1");
-            exit;
-        } else {
-            $errors[] = "Failed to update sneaker.";
+        // Handle new image upload
+        if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+            $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            $file_info = getimagesize($_FILES['image']['tmp_name']);
+            
+            if ($file_info && in_array($file_info['mime'], $allowed_types)) {
+                $upload_dir = '../uploads/images/';
+                
+                // Delete old image
+                if ($sneaker['image_path'] && file_exists('../' . $sneaker['image_path'])) {
+                    unlink('../' . $sneaker['image_path']);
+                }
+                
+                $extension = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+                $filename = uniqid('sneaker_') . '.' . $extension;
+                $target_path = $upload_dir . $filename;
+                
+                if (move_uploaded_file($_FILES['image']['tmp_name'], $target_path)) {
+                    $image_path = 'uploads/images/' . $filename;
+                    resize_image($target_path, 800, 800);
+                } else {
+                    $errors[] = "Failed to upload image.";
+                }
+            } else {
+                $errors[] = "Invalid image file.";
+            }
+        }
+        
+        // Update if no errors
+        if (empty($errors)) {
+            $update_query = "UPDATE sneakers SET 
+                            name = :name, 
+                            brand = :brand, 
+                            colorway = :colorway, 
+                            release_date = :release_date, 
+                            retail_price = :retail_price, 
+                            description = :description, 
+                            image_path = :image_path, 
+                            category_id = :category_id, 
+                            sku = :sku 
+                            WHERE id = :id";
+            $update_stmt = $db->prepare($update_query);
+            $update_stmt->bindValue(':name', $name);
+            $update_stmt->bindValue(':brand', $brand);
+            $update_stmt->bindValue(':colorway', $colorway);
+            $update_stmt->bindValue(':release_date', $release_date);
+            $update_stmt->bindValue(':retail_price', $retail_price);
+            $update_stmt->bindValue(':description', $description);
+            $update_stmt->bindValue(':image_path', $image_path);
+            $update_stmt->bindValue(':category_id', $category_id, PDO::PARAM_INT);
+            $update_stmt->bindValue(':sku', $sku);
+            $update_stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            
+            if ($update_stmt->execute()) {
+                header("Location: dashboard.php?updated=1");
+                exit;
+            } else {
+                $errors[] = "Failed to update sneaker.";
+            }
         }
     }
-}
 
-function resize_image($file, $max_width, $max_height) {
-    list($width, $height, $type) = getimagesize($file);
-    
-    if ($width <= $max_width && $height <= $max_height) {
-        return;
-    }
-    
-    $ratio = min($max_width / $width, $max_height / $height);
-    $new_width = round($width * $ratio);
-    $new_height = round($height * $ratio);
-    
-    $src = null;
-    switch ($type) {
-        case IMAGETYPE_JPEG:
-            $src = imagecreatefromjpeg($file);
-            break;
-        case IMAGETYPE_PNG:
-            $src = imagecreatefrompng($file);
-            break;
-        case IMAGETYPE_GIF:
-            $src = imagecreatefromgif($file);
-            break;
-        case IMAGETYPE_WEBP:
-            $src = imagecreatefromwebp($file);
-            break;
-        default:
+    function resize_image($file, $max_width, $max_height) {
+        list($width, $height, $type) = getimagesize($file);
+        
+        if ($width <= $max_width && $height <= $max_height) {
             return;
+        }
+        
+        $ratio = min($max_width / $width, $max_height / $height);
+        $new_width = round($width * $ratio);
+        $new_height = round($height * $ratio);
+        
+        $src = null;
+        switch ($type) {
+            case IMAGETYPE_JPEG:
+                $src = imagecreatefromjpeg($file);
+                break;
+            case IMAGETYPE_PNG:
+                $src = imagecreatefrompng($file);
+                break;
+            case IMAGETYPE_GIF:
+                $src = imagecreatefromgif($file);
+                break;
+            case IMAGETYPE_WEBP:
+                $src = imagecreatefromwebp($file);
+                break;
+            default:
+                return;
+        }
+        
+        $dst = imagecreatetruecolor($new_width, $new_height);
+        
+        if ($type == IMAGETYPE_PNG || $type == IMAGETYPE_GIF) {
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+        }
+        
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
+        
+        switch ($type) {
+            case IMAGETYPE_JPEG:
+                imagejpeg($dst, $file, 90);
+                break;
+            case IMAGETYPE_PNG:
+                imagepng($dst, $file, 9);
+                break;
+            case IMAGETYPE_GIF:
+                imagegif($dst, $file);
+                break;
+            case IMAGETYPE_WEBP:
+                imagewebp($dst, $file, 90);
+                break;
+        }
+        
+        imagedestroy($src);
+        imagedestroy($dst);
     }
-    
-    $dst = imagecreatetruecolor($new_width, $new_height);
-    
-    if ($type == IMAGETYPE_PNG || $type == IMAGETYPE_GIF) {
-        imagealphablending($dst, false);
-        imagesavealpha($dst, true);
-    }
-    
-    imagecopyresampled($dst, $src, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
-    
-    switch ($type) {
-        case IMAGETYPE_JPEG:
-            imagejpeg($dst, $file, 90);
-            break;
-        case IMAGETYPE_PNG:
-            imagepng($dst, $file, 9);
-            break;
-        case IMAGETYPE_GIF:
-            imagegif($dst, $file);
-            break;
-        case IMAGETYPE_WEBP:
-            imagewebp($dst, $file, 90);
-            break;
-    }
-    
-    imagedestroy($src);
-    imagedestroy($dst);
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">

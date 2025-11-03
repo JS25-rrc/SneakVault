@@ -165,8 +165,17 @@ a:hover {
 }
 
 /* Dropdown Menu */
+.dropdown {
+    position: relative;
+}
+
+.dropdown-toggle::after {
+    content: ' ▼';
+    font-size: 0.7em;
+}
+
 .dropdown-menu {
-    display: none;
+    display: none !important;
     position: absolute;
     top: 100%;
     left: 0;
@@ -176,19 +185,24 @@ a:hover {
     border-radius: var(--radius-sm);
     margin-top: var(--spacing-xs);
     padding: var(--spacing-xs) 0;
+    z-index: 1000;
+    list-style: none;
 }
 
 .dropdown:hover .dropdown-menu {
-    display: block;
+    display: block !important;
 }
 
 .dropdown-menu li {
     list-style: none;
+    margin: 0;
 }
 
 .dropdown-menu a {
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: 0;
+    display: block;
+    white-space: nowrap;
 }
 
 .dropdown-menu a:hover {

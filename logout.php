@@ -1,13 +1,4 @@
 <?php
-    /**
-     * SneakVault CMS - Logout Handler
-     * 
-     * Logs out the current user and destroys the session.
-     * 
-     * Requirements Met:
-     * - 7.4: Login/logout functionality (5%)
-     */
-
     session_start();
 
     // Clear all session variables

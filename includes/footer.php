@@ -1,11 +1,4 @@
 <?php
-/**
- * SneakVault CMS - Site Footer
- * 
- * This file contains the site footer with links and information.
- * It is included on all pages.
- */
-
 // Get current year for copyright
 $current_year = date('Y');
 
