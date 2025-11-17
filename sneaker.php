@@ -94,7 +94,7 @@ if (isset($_GET['commented']) && $_GET['commented'] == '1') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($sneaker['name']) ?> - SneakVault</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/styles.css">
     <style>
         .sneaker-detail {
             margin: 2rem 0;
@@ -303,7 +303,7 @@ if (isset($_GET['commented']) && $_GET['commented'] == '1') {
             <!-- Description -->
             <div class="sneaker-description">
                 <h2>Description</h2>
-                <p><?= nl2br(htmlspecialchars($sneaker['description'])) ?></p>
+                <?= nl2br(htmlspecialchars($sneaker['description'])) ?>
             </div>
             
             <!-- Comments Section -->
