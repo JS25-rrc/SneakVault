@@ -1,17 +1,18 @@
 <?php
-    // Start session if not already started
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
 
-    // Fetch categories for navigation dropdown
-    $cat_query = "SELECT * FROM categories ORDER BY name ASC";
-    $cat_stmt = $db->prepare($cat_query);
-    $cat_stmt->execute();
-    $categories = $cat_stmt->fetchAll(PDO::FETCH_ASSOC);
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-    // Get current page for active menu highlighting
-    $current_page = basename($_SERVER['PHP_SELF']);
+// Fetch categories for navigation dropdown
+$cat_query = "SELECT * FROM categories ORDER BY name ASC";
+$cat_stmt = $db->prepare($cat_query);
+$cat_stmt->execute();
+$categories = $cat_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get current page for active menu highlighting
+$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <header class="site-header">
     <div class="container">
@@ -52,10 +53,14 @@
                     </li>
                     
                     <li>
-                        <a href="<?= strpos($current_page, 'admin') !== false ? '../search.php' : 'search.php' ?>" 
-                           class="<?= $current_page === 'search.php' ? 'active' : '' ?>">
-                            Search
-                        </a>
+                        <form method="get" action="<?= strpos($current_page, 'admin') !== false ? '../search.php' : 'search.php' ?>" 
+                              style="display: inline-block; margin: 0;">
+                            <input type="text" 
+                                   name="keyword" 
+                                   placeholder="Search..." 
+                                   style="padding: 0.4rem 0.8rem; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; background: rgba(255,255,255,0.1); color: white; width: 150px;"
+                                   required>
+                        </form>
                     </li>
                     
                     <?php if(isset($_SESSION['user_id'])): ?>
