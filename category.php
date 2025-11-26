@@ -1,53 +1,54 @@
 <?php
-    require('connect.php');
 
-    // Validate and sanitize category ID
-    $category_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+require('connect.php');
 
-    if (!$category_id) {
-        header("Location: index.php");
-        exit;
-    }
+// Validate and sanitize category ID
+$category_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 
-    // Fetch category details
-    $cat_query = "SELECT * FROM categories WHERE id = :id";
-    $cat_stmt = $db->prepare($cat_query);
-    $cat_stmt->bindValue(':id', $category_id, PDO::PARAM_INT);
-    $cat_stmt->execute();
-    $category = $cat_stmt->fetch(PDO::FETCH_ASSOC);
+if (!$category_id) {
+    header("Location: index.php");
+    exit;
+}
 
-    if (!$category) {
-        header("Location: index.php");
-        exit;
-    }
+// Fetch category details
+$cat_query = "SELECT * FROM categories WHERE id = :id";
+$cat_stmt = $db->prepare($cat_query);
+$cat_stmt->bindValue(':id', $category_id, PDO::PARAM_INT);
+$cat_stmt->execute();
+$category = $cat_stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Pagination setup
-    $page = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT) ?? 1;
-    $page = max(1, $page);
-    $per_page = 12;
-    $offset = ($page - 1) * $per_page;
+if (!$category) {
+    header("Location: index.php");
+    exit;
+}
 
-    // Get total count for this category
-    $count_query = "SELECT COUNT(*) FROM sneakers WHERE category_id = :category_id";
-    $count_stmt = $db->prepare($count_query);
-    $count_stmt->bindValue(':category_id', $category_id, PDO::PARAM_INT);
-    $count_stmt->execute();
-    $total_sneakers = $count_stmt->fetchColumn();
-    $total_pages = ceil($total_sneakers / $per_page);
+// Pagination setup
+$page = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT) ?? 1;
+$page = max(1, $page);
+$per_page = 12;
+$offset = ($page - 1) * $per_page;
 
-    // Fetch sneakers in this category
-    $query = "SELECT s.*, c.name as category_name 
-            FROM sneakers s 
-            LEFT JOIN categories c ON s.category_id = c.id 
-            WHERE s.category_id = :category_id
-            ORDER BY s.created_at DESC 
-            LIMIT :limit OFFSET :offset";
-    $statement = $db->prepare($query);
-    $statement->bindValue(':category_id', $category_id, PDO::PARAM_INT);
-    $statement->bindValue(':limit', $per_page, PDO::PARAM_INT);
-    $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
-    $statement->execute();
-    $sneakers = $statement->fetchAll(PDO::FETCH_ASSOC);
+// Get total count for this category
+$count_query = "SELECT COUNT(*) FROM sneakers WHERE category_id = :category_id";
+$count_stmt = $db->prepare($count_query);
+$count_stmt->bindValue(':category_id', $category_id, PDO::PARAM_INT);
+$count_stmt->execute();
+$total_sneakers = $count_stmt->fetchColumn();
+$total_pages = ceil($total_sneakers / $per_page);
+
+// Fetch sneakers in this category
+$query = "SELECT s.*, c.name as category_name 
+          FROM sneakers s 
+          LEFT JOIN categories c ON s.category_id = c.id 
+          WHERE s.category_id = :category_id
+          ORDER BY s.created_at DESC 
+          LIMIT :limit OFFSET :offset";
+$statement = $db->prepare($query);
+$statement->bindValue(':category_id', $category_id, PDO::PARAM_INT);
+$statement->bindValue(':limit', $per_page, PDO::PARAM_INT);
+$statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+$statement->execute();
+$sneakers = $statement->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -107,6 +108,25 @@
             <a href="sneakers.php">All Sneakers</a> / 
             <strong><?= htmlspecialchars($category['name']) ?></strong>
         </nav>
+        
+        <!-- Category Filter Dropdown -->
+        <div style="background: white; padding: 1.5rem; border-radius: var(--radius-md); margin-bottom: 2rem; box-shadow: var(--shadow-sm);">
+            <form method="get" action="category.php" style="display: flex; gap: 1rem; align-items: end;">
+                <div class="form-group" style="flex: 1; margin: 0;">
+                    <label for="category_filter">Filter by Category:</label>
+                    <select id="category_filter" name="id" onchange="this.form.submit()">
+                        <?php
+                        $all_cats = $db->query("SELECT * FROM categories ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+                        foreach($all_cats as $cat):
+                        ?>
+                            <option value="<?= $cat['id'] ?>" <?= $cat['id'] == $category_id ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($cat['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </form>
+        </div>
         
         <!-- Category Header -->
         <header class="category-header">

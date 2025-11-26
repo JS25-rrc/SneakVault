@@ -1,154 +1,154 @@
 <?php
-    require('../connect.php');
-    session_start();
+require('../connect.php');
+session_start();
 
-    // Check admin access
-    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-        header("Location: ../login.php");
-        exit;
+// Check admin access
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header("Location: ../login.php");
+    exit;
+}
+
+// Fetch categories for dropdown
+$cat_query = "SELECT * FROM categories ORDER BY name ASC";
+$categories = $db->query($cat_query)->fetchAll(PDO::FETCH_ASSOC);
+
+$errors = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Sanitize inputs
+    $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $brand = filter_input(INPUT_POST, 'brand', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $colorway = filter_input(INPUT_POST, 'colorway', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $release_date = filter_input(INPUT_POST, 'release_date', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $retail_price = filter_input(INPUT_POST, 'retail_price', FILTER_VALIDATE_FLOAT);
+    $description = filter_input(INPUT_POST, 'description', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $category_id = filter_input(INPUT_POST, 'category_id', FILTER_VALIDATE_INT);
+    $sku = filter_input(INPUT_POST, 'sku', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    
+    // Validation rules
+    if (empty($name)) {
+        $errors[] = "Sneaker name is required.";
     }
-
-    // Fetch categories for dropdown
-    $cat_query = "SELECT * FROM categories ORDER BY name ASC";
-    $categories = $db->query($cat_query)->fetchAll(PDO::FETCH_ASSOC);
-
-    $errors = [];
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Sanitize inputs
-        $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $brand = filter_input(INPUT_POST, 'brand', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $colorway = filter_input(INPUT_POST, 'colorway', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $release_date = filter_input(INPUT_POST, 'release_date', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $retail_price = filter_input(INPUT_POST, 'retail_price', FILTER_VALIDATE_FLOAT);
-        $description = filter_input(INPUT_POST, 'description', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $category_id = filter_input(INPUT_POST, 'category_id', FILTER_VALIDATE_INT);
-        $sku = filter_input(INPUT_POST, 'sku', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    if (empty($brand)) {
+        $errors[] = "Brand is required.";
+    }
+    if (empty($description)) {
+        $errors[] = "Description is required.";
+    }
+    if (!$category_id) {
+        $errors[] = "Please select a valid category.";
+    }
+    
+    // Handle image upload
+    $image_path = null;
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+        $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $file_info = getimagesize($_FILES['image']['tmp_name']);
         
-        // Validation rules
-        if (empty($name)) {
-            $errors[] = "Sneaker name is required.";
-        }
-        if (empty($brand)) {
-            $errors[] = "Brand is required.";
-        }
-        if (empty($description)) {
-            $errors[] = "Description is required.";
-        }
-        if (!$category_id) {
-            $errors[] = "Please select a valid category.";
-        }
-        
-        // Handle image upload
-        $image_path = null;
-        if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-            $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-            $file_info = getimagesize($_FILES['image']['tmp_name']);
-            
-            if ($file_info && in_array($file_info['mime'], $allowed_types)) {
-                $upload_dir = '../uploads/images/';
-                if (!is_dir($upload_dir)) {
-                    mkdir($upload_dir, 0755, true);
-                }
-                
-                $extension = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
-                $filename = uniqid('sneaker_') . '.' . $extension;
-                $target_path = $upload_dir . $filename;
-                
-                if (move_uploaded_file($_FILES['image']['tmp_name'], $target_path)) {
-                    $image_path = 'uploads/images/' . $filename;
-                    
-                    // Resize image
-                    resize_image($target_path, 800, 800);
-                } else {
-                    $errors[] = "Failed to upload image.";
-                }
-            } else {
-                $errors[] = "Invalid image file. Only JPEG, PNG, GIF, and WebP are allowed.";
+        if ($file_info && in_array($file_info['mime'], $allowed_types)) {
+            $upload_dir = '../uploads/images/';
+            if (!is_dir($upload_dir)) {
+                mkdir($upload_dir, 0755, true);
             }
-        }
-        
-        // Insert if no errors
-        if (empty($errors)) {
-            $query = "INSERT INTO sneakers (name, brand, colorway, release_date, retail_price, description, image_path, category_id, sku) 
-                    VALUES (:name, :brand, :colorway, :release_date, :retail_price, :description, :image_path, :category_id, :sku)";
-            $statement = $db->prepare($query);
-            $statement->bindValue(':name', $name);
-            $statement->bindValue(':brand', $brand);
-            $statement->bindValue(':colorway', $colorway);
-            $statement->bindValue(':release_date', $release_date);
-            $statement->bindValue(':retail_price', $retail_price);
-            $statement->bindValue(':description', $description);
-            $statement->bindValue(':image_path', $image_path);
-            $statement->bindValue(':category_id', $category_id, PDO::PARAM_INT);
-            $statement->bindValue(':sku', $sku);
             
-            if ($statement->execute()) {
-                header("Location: dashboard.php?created=1");
-                exit;
+            $extension = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+            $filename = uniqid('sneaker_') . '.' . $extension;
+            $target_path = $upload_dir . $filename;
+            
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $target_path)) {
+                $image_path = 'uploads/images/' . $filename;
+                
+                // Resize image
+                resize_image($target_path, 800, 800);
             } else {
-                $errors[] = "Failed to create sneaker.";
+                $errors[] = "Failed to upload image.";
             }
+        } else {
+            $errors[] = "Invalid image file. Only JPEG, PNG, GIF, and WebP are allowed.";
         }
     }
-
-    function resize_image($file, $max_width, $max_height) {
-        list($width, $height, $type) = getimagesize($file);
+    
+    // Insert if no errors
+    if (empty($errors)) {
+        $query = "INSERT INTO sneakers (name, brand, colorway, release_date, retail_price, description, image_path, category_id, sku) 
+                  VALUES (:name, :brand, :colorway, :release_date, :retail_price, :description, :image_path, :category_id, :sku)";
+        $statement = $db->prepare($query);
+        $statement->bindValue(':name', $name);
+        $statement->bindValue(':brand', $brand);
+        $statement->bindValue(':colorway', $colorway);
+        $statement->bindValue(':release_date', $release_date);
+        $statement->bindValue(':retail_price', $retail_price);
+        $statement->bindValue(':description', $description);
+        $statement->bindValue(':image_path', $image_path);
+        $statement->bindValue(':category_id', $category_id, PDO::PARAM_INT);
+        $statement->bindValue(':sku', $sku);
         
-        if ($width <= $max_width && $height <= $max_height) {
+        if ($statement->execute()) {
+            header("Location: dashboard.php?created=1");
+            exit;
+        } else {
+            $errors[] = "Failed to create sneaker.";
+        }
+    }
+}
+
+function resize_image($file, $max_width, $max_height) {
+    list($width, $height, $type) = getimagesize($file);
+    
+    if ($width <= $max_width && $height <= $max_height) {
+        return;
+    }
+    
+    $ratio = min($max_width / $width, $max_height / $height);
+    $new_width = round($width * $ratio);
+    $new_height = round($height * $ratio);
+    
+    $src = null;
+    switch ($type) {
+        case IMAGETYPE_JPEG:
+            $src = imagecreatefromjpeg($file);
+            break;
+        case IMAGETYPE_PNG:
+            $src = imagecreatefrompng($file);
+            break;
+        case IMAGETYPE_GIF:
+            $src = imagecreatefromgif($file);
+            break;
+        case IMAGETYPE_WEBP:
+            $src = imagecreatefromwebp($file);
+            break;
+        default:
             return;
-        }
-        
-        $ratio = min($max_width / $width, $max_height / $height);
-        $new_width = round($width * $ratio);
-        $new_height = round($height * $ratio);
-        
-        $src = null;
-        switch ($type) {
-            case IMAGETYPE_JPEG:
-                $src = imagecreatefromjpeg($file);
-                break;
-            case IMAGETYPE_PNG:
-                $src = imagecreatefrompng($file);
-                break;
-            case IMAGETYPE_GIF:
-                $src = imagecreatefromgif($file);
-                break;
-            case IMAGETYPE_WEBP:
-                $src = imagecreatefromwebp($file);
-                break;
-            default:
-                return;
-        }
-        
-        $dst = imagecreatetruecolor($new_width, $new_height);
-        
-        // Preserve transparency for PNG and GIF
-        if ($type == IMAGETYPE_PNG || $type == IMAGETYPE_GIF) {
-            imagealphablending($dst, false);
-            imagesavealpha($dst, true);
-        }
-        
-        imagecopyresampled($dst, $src, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
-        
-        switch ($type) {
-            case IMAGETYPE_JPEG:
-                imagejpeg($dst, $file, 90);
-                break;
-            case IMAGETYPE_PNG:
-                imagepng($dst, $file, 9);
-                break;
-            case IMAGETYPE_GIF:
-                imagegif($dst, $file);
-                break;
-            case IMAGETYPE_WEBP:
-                imagewebp($dst, $file, 90);
-                break;
-        }
-        
-        imagedestroy($src);
-        imagedestroy($dst);
     }
+    
+    $dst = imagecreatetruecolor($new_width, $new_height);
+    
+    // Preserve transparency for PNG and GIF
+    if ($type == IMAGETYPE_PNG || $type == IMAGETYPE_GIF) {
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+    }
+    
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
+    
+    switch ($type) {
+        case IMAGETYPE_JPEG:
+            imagejpeg($dst, $file, 90);
+            break;
+        case IMAGETYPE_PNG:
+            imagepng($dst, $file, 9);
+            break;
+        case IMAGETYPE_GIF:
+            imagegif($dst, $file);
+            break;
+        case IMAGETYPE_WEBP:
+            imagewebp($dst, $file, 90);
+            break;
+    }
+    
+    imagedestroy($src);
+    imagedestroy($dst);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -164,7 +164,34 @@
             height: 300,
             menubar: false,
             plugins: 'lists link',
-            toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright | bullist numlist | link'
+            toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright | bullist numlist | link',
+            setup: function(editor) {
+                editor.on('init', function() {
+                    // Remove required attribute from hidden textarea
+                    document.getElementById('description').removeAttribute('required');
+                });
+                // Add custom validation on form submit
+                editor.on('submit', function() {
+                    if (editor.getContent() === '') {
+                        alert('Description is required.');
+                        return false;
+                    }
+                });
+            }
+        });
+        
+        // Add form validation before submit
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form');
+            form.addEventListener('submit', function(e) {
+                const content = tinymce.get('description').getContent();
+                if (!content || content.trim() === '') {
+                    e.preventDefault();
+                    alert('Description is required.');
+                    tinymce.get('description').focus();
+                    return false;
+                }
+            });
         });
     </script>
     <style>
