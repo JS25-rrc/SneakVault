@@ -1,15 +1,4 @@
 <?php
-/**
- * SneakVault CMS - Search Page
- * 
- * Search functionality with keyword and category filtering.
- * 
- * Requirements Met:
- * - 3.1: Search by keyword (5%)
- * - 3.2: Search with category filter (5%)
- * - 3.3: Paginated search results (5%)
- */
-
 require('connect.php');
 
 // Get search parameters
@@ -32,24 +21,25 @@ $total_pages = 0;
 
 if ($keyword || $category_id) {
     // Build query
-    $query = "SELECT s.*, c.name as category_name FROM sneakers s 
-              LEFT JOIN categories c ON s.category_id = c.id WHERE 1=1";
-    $count_query = "SELECT COUNT(*) FROM sneakers s WHERE 1=1";
+    $where_conditions = [];
     $params = [];
     
     if ($keyword) {
-        $search_condition = " AND (s.name LIKE :keyword OR s.brand LIKE :keyword OR s.description LIKE :keyword OR s.colorway LIKE :keyword OR s.sku LIKE :keyword)";
-        $query .= $search_condition;
-        $count_query .= $search_condition;
+        $where_conditions[] = "(s.name LIKE :keyword OR s.brand LIKE :keyword OR s.description LIKE :keyword OR s.colorway LIKE :keyword OR s.sku LIKE :keyword)";
         $params[':keyword'] = '%' . $keyword . '%';
     }
     
     if ($category_id) {
-        $category_condition = " AND s.category_id = :category_id";
-        $query .= $category_condition;
-        $count_query .= $category_condition;
+        $where_conditions[] = "s.category_id = :category_id";
         $params[':category_id'] = $category_id;
     }
+    
+    $where_clause = count($where_conditions) > 0 ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+    
+    $query = "SELECT s.*, c.name as category_name FROM sneakers s 
+              LEFT JOIN categories c ON s.category_id = c.id 
+              $where_clause";
+    $count_query = "SELECT COUNT(*) FROM sneakers s $where_clause";
     
     // Get total count
     $count_stmt = $db->prepare($count_query);
