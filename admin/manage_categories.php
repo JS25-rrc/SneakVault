@@ -1,4 +1,5 @@
 <?php
+
 require('../connect.php');
 session_start();
 
@@ -132,7 +133,7 @@ if (isset($_GET['edit'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Categories - SneakVault Admin</title>
-    <link rel="stylesheet" href="../css/styles.css">
+    <link rel="stylesheet" href="../css/style.css">
     <style>
         .categories-container {
             display: grid;
@@ -210,7 +211,7 @@ if (isset($_GET['edit'])) {
             <div class="category-form">
                 <h2><?= $edit_category ? 'Edit Category' : 'Add New Category' ?></h2>
                 
-                <form method="post" action="">
+                <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?><?= $edit_category ? '?edit=' . $edit_category['id'] : '' ?>">
                     <?php if($edit_category): ?>
                         <input type="hidden" name="id" value="<?= $edit_category['id'] ?>">
                     <?php endif; ?>
