@@ -1,53 +1,54 @@
 <?php
-    require('../connect.php');
-    session_start();
 
-    // Check admin access
-    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-        header("Location: ../login.php");
+require('../connect.php');
+session_start();
+
+// Check admin access
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header("Location: ../login.php");
+    exit;
+}
+
+// Validate ID
+$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+
+if (!$id) {
+    header("Location: dashboard.php");
+    exit;
+}
+
+// Get sneaker info for image deletion
+$query = "SELECT image_path, name FROM sneakers WHERE id = :id";
+$stmt = $db->prepare($query);
+$stmt->bindValue(':id', $id, PDO::PARAM_INT);
+$stmt->execute();
+$sneaker = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$sneaker) {
+    header("Location: dashboard.php");
+    exit;
+}
+
+// Handle POST request for confirmed deletion
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_delete'])) {
+    // Delete associated image file if exists
+    if ($sneaker['image_path'] && file_exists('../' . $sneaker['image_path'])) {
+        unlink('../' . $sneaker['image_path']);
+    }
+    
+    // Delete from database
+    // Comments and API cache will be deleted automatically due to CASCADE
+    $delete_query = "DELETE FROM sneakers WHERE id = :id";
+    $delete_stmt = $db->prepare($delete_query);
+    $delete_stmt->bindValue(':id', $id, PDO::PARAM_INT);
+    
+    if ($delete_stmt->execute()) {
+        header("Location: dashboard.php?deleted=1");
         exit;
+    } else {
+        $error = "Failed to delete sneaker.";
     }
-
-    // Validate ID
-    $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-
-    if (!$id) {
-        header("Location: dashboard.php");
-        exit;
-    }
-
-    // Get sneaker info for image deletion
-    $query = "SELECT image_path, name FROM sneakers WHERE id = :id";
-    $stmt = $db->prepare($query);
-    $stmt->bindValue(':id', $id, PDO::PARAM_INT);
-    $stmt->execute();
-    $sneaker = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$sneaker) {
-        header("Location: dashboard.php");
-        exit;
-    }
-
-    // Handle POST request for confirmed deletion
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_delete'])) {
-        // Delete associated image file if exists
-        if ($sneaker['image_path'] && file_exists('../' . $sneaker['image_path'])) {
-            unlink('../' . $sneaker['image_path']);
-        }
-        
-        // Delete from database
-        // Comments and API cache will be deleted automatically due to CASCADE
-        $delete_query = "DELETE FROM sneakers WHERE id = :id";
-        $delete_stmt = $db->prepare($delete_query);
-        $delete_stmt->bindValue(':id', $id, PDO::PARAM_INT);
-        
-        if ($delete_stmt->execute()) {
-            header("Location: dashboard.php?deleted=1");
-            exit;
-        } else {
-            $error = "Failed to delete sneaker.";
-        }
-    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -55,7 +56,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Delete Sneaker - SneakVault Admin</title>
-    <link rel="stylesheet" href="../css/styles.css">
+    <link rel="stylesheet" href="../css/style.css">
     <style>
         .delete-container {
             max-width: 600px;
@@ -126,7 +127,7 @@
                 <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
             
-            <form method="post" action="">
+            <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>?id=<?= $id ?>">
                 <p style="margin: 1.5rem 0;"><strong>Are you absolutely sure you want to delete this sneaker?</strong></p>
                 
                 <div class="action-buttons">
