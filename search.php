@@ -25,49 +25,40 @@ if ($keyword || $category_id) {
     $params = [];
     
     if ($keyword) {
-        $where_conditions[] = "(s.name LIKE :keyword OR s.brand LIKE :keyword OR s.description LIKE :keyword OR s.colorway LIKE :keyword OR s.sku LIKE :keyword)";
-        $params[':keyword'] = '%' . $keyword . '%';
+        $where_conditions[] = "(s.name LIKE ? OR s.brand LIKE ? OR s.description LIKE ? OR s.colorway LIKE ? OR s.sku LIKE ?)";
+        $search_term = '%' . $keyword . '%';
+        $params[] = $search_term;
+        $params[] = $search_term;
+        $params[] = $search_term;
+        $params[] = $search_term;
+        $params[] = $search_term;
     }
     
     if ($category_id) {
-        $where_conditions[] = "s.category_id = :category_id";
-        $params[':category_id'] = $category_id;
+        $where_conditions[] = "s.category_id = ?";
+        $params[] = $category_id;
     }
     
     $where_clause = count($where_conditions) > 0 ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
     
-    $query = "SELECT s.*, c.name as category_name FROM sneakers s 
-              LEFT JOIN categories c ON s.category_id = c.id 
-              $where_clause";
-    $count_query = "SELECT COUNT(*) FROM sneakers s $where_clause";
-    
     // Get total count
+    $count_query = "SELECT COUNT(*) FROM sneakers s $where_clause";
     $count_stmt = $db->prepare($count_query);
-    foreach ($params as $key => $value) {
-        if ($key === ':category_id') {
-            $count_stmt->bindValue($key, $value, PDO::PARAM_INT);
-        } else {
-            $count_stmt->bindValue($key, $value);
-        }
-    }
-    $count_stmt->execute();
+    $count_stmt->execute($params);
     $total_results = $count_stmt->fetchColumn();
     $total_pages = ceil($total_results / $per_page);
     
     // Get results with pagination
-    $query .= " ORDER BY s.created_at DESC LIMIT :limit OFFSET :offset";
+    $query = "SELECT s.*, c.name as category_name FROM sneakers s 
+              LEFT JOIN categories c ON s.category_id = c.id 
+              $where_clause
+              ORDER BY s.created_at DESC LIMIT ? OFFSET ?";
+    
     $statement = $db->prepare($query);
     
-    foreach ($params as $key => $value) {
-        if ($key === ':category_id') {
-            $statement->bindValue($key, $value, PDO::PARAM_INT);
-        } else {
-            $statement->bindValue($key, $value);
-        }
-    }
-    $statement->bindValue(':limit', $per_page, PDO::PARAM_INT);
-    $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
-    $statement->execute();
+    // Add pagination parameters
+    $all_params = array_merge($params, [$per_page, $offset]);
+    $statement->execute($all_params);
     $sneakers = $statement->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
@@ -77,7 +68,7 @@ if ($keyword || $category_id) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Search Sneakers - SneakVault</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/styles.css">
     <style>
         .search-container {
             background-color: white;

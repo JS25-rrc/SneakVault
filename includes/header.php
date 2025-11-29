@@ -33,8 +33,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     </li>
                     
                     <li>
-                        <a href="<?= strpos($current_page, 'admin') !== false ? '../sneakers.php' : 'sneakers.php' ?>" 
-                           class="<?= $current_page === 'sneakers.php' ? 'active' : '' ?>">
+                        <a href="<?= strpos($current_page, 'admin') !== false ? '../sneaker.php' : 'sneaker.php' ?>" 
+                           class="<?= $current_page === 'sneaker.php' ? 'active' : '' ?>">
                             All Sneakers
                         </a>
                     </li>
