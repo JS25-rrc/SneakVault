@@ -32,13 +32,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         </a>
                     </li>
                     
-                    <li>
-                        <a href="<?= strpos($current_page, 'admin') !== false ? '../sneaker.php' : 'sneaker.php' ?>" 
-                           class="<?= $current_page === 'sneaker.php' ? 'active' : '' ?>">
-                            All Sneakers
-                        </a>
-                    </li>
-                    
                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle" onclick="return false;">Categories</a>
                         <ul class="dropdown-menu">
