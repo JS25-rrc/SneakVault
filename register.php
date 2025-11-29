@@ -1,88 +1,88 @@
 <?php
-    require('connect.php');
-    session_start();
+require('connect.php');
+session_start();
 
-    // Redirect if already logged in
-    if (isset($_SESSION['user_id'])) {
-        header("Location: index.php");
-        exit;
+// Redirect if already logged in
+if (isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit;
+}
+
+$errors = [];
+$success = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Sanitize inputs
+    $username = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+    $password = $_POST['password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+    
+    // Validation rules
+    if (empty($username)) {
+        $errors[] = "Username is required.";
+    } elseif (strlen($username) < 3) {
+        $errors[] = "Username must be at least 3 characters long.";
+    } elseif (strlen($username) > 50) {
+        $errors[] = "Username must not exceed 50 characters.";
     }
-
-    $errors = [];
-    $success = '';
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Sanitize inputs
-        $username = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-        $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
-        $password = $_POST['password'] ?? '';
-        $confirm_password = $_POST['confirm_password'] ?? '';
+    
+    if (empty($email)) {
+        $errors[] = "Email is required.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Please enter a valid email address.";
+    }
+    
+    if (empty($password)) {
+        $errors[] = "Password is required.";
+    } elseif (strlen($password) < 6) {
+        $errors[] = "Password must be at least 6 characters long.";
+    }
+    
+    // Check if passwords match
+    if ($password !== $confirm_password) {
+        $errors[] = "Passwords do not match.";
+    }
+    
+    // Check if username or email already exists
+    if (empty($errors)) {
+        $check_query = "SELECT id FROM users WHERE username = :username OR email = :email";
+        $check_stmt = $db->prepare($check_query);
+        $check_stmt->bindValue(':username', $username);
+        $check_stmt->bindValue(':email', $email);
+        $check_stmt->execute();
         
-        // Validation rules
-        if (empty($username)) {
-            $errors[] = "Username is required.";
-        } elseif (strlen($username) < 3) {
-            $errors[] = "Username must be at least 3 characters long.";
-        } elseif (strlen($username) > 50) {
-            $errors[] = "Username must not exceed 50 characters.";
-        }
-        
-        if (empty($email)) {
-            $errors[] = "Email is required.";
-        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = "Please enter a valid email address.";
-        }
-        
-        if (empty($password)) {
-            $errors[] = "Password is required.";
-        } elseif (strlen($password) < 6) {
-            $errors[] = "Password must be at least 6 characters long.";
-        }
-        
-        // Check if passwords match
-        if ($password !== $confirm_password) {
-            $errors[] = "Passwords do not match.";
-        }
-        
-        // Check if username or email already exists
-        if (empty($errors)) {
-            $check_query = "SELECT id FROM users WHERE username = :username OR email = :email";
-            $check_stmt = $db->prepare($check_query);
-            $check_stmt->bindValue(':username', $username);
-            $check_stmt->bindValue(':email', $email);
-            $check_stmt->execute();
-            
-            if ($check_stmt->fetch()) {
-                $errors[] = "Username or email is already in use. Please choose another.";
-            }
-        }
-        
-        // Insert new user if no errors
-        if (empty($errors)) {
-            // Hash password using password_hash()
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            
-            $insert_query = "INSERT INTO users (username, email, password, role) 
-                            VALUES (:username, :email, :password, 'user')";
-            $insert_stmt = $db->prepare($insert_query);
-            $insert_stmt->bindValue(':username', $username);
-            $insert_stmt->bindValue(':email', $email);
-            $insert_stmt->bindValue(':password', $hashed_password);
-            
-            if ($insert_stmt->execute()) {
-                // Auto-login the user after registration
-                $new_user_id = $db->lastInsertId();
-                $_SESSION['user_id'] = $new_user_id;
-                $_SESSION['username'] = $username;
-                $_SESSION['role'] = 'user';
-                
-                header("Location: index.php");
-                exit;
-            } else {
-                $errors[] = "Registration failed. Please try again.";
-            }
+        if ($check_stmt->fetch()) {
+            $errors[] = "Username or email is already in use. Please choose another.";
         }
     }
+    
+    // Insert new user if no errors
+    if (empty($errors)) {
+        // Hash password using password_hash()
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        
+        $insert_query = "INSERT INTO users (username, email, password, role) 
+                        VALUES (:username, :email, :password, 'user')";
+        $insert_stmt = $db->prepare($insert_query);
+        $insert_stmt->bindValue(':username', $username);
+        $insert_stmt->bindValue(':email', $email);
+        $insert_stmt->bindValue(':password', $hashed_password);
+        
+        if ($insert_stmt->execute()) {
+            // Auto-login the user after registration
+            $new_user_id = $db->lastInsertId();
+            $_SESSION['user_id'] = $new_user_id;
+            $_SESSION['username'] = $username;
+            $_SESSION['role'] = 'user';
+            
+            header("Location: index.php");
+            exit;
+        } else {
+            $errors[] = "Registration failed. Please try again.";
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -90,7 +90,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - SneakVault</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/style.css">
     <style>
         .register-container {
             max-width: 500px;
@@ -155,7 +155,7 @@
                 <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
             <?php endif; ?>
             
-            <form method="post" action="">
+            <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">
                 <div class="form-group">
                     <label for="username">Username: <span class="required">*</span></label>
                     <input type="text" 
