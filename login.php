@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - SneakVault</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/style.css">
     <style>
         .login-container {
             max-width: 450px;
@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
             
-            <form method="post" action="">
+            <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">
                 <div class="form-group">
                     <label for="username">Username: <span class="required">*</span></label>
                     <input type="text" 
