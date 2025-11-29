@@ -1,4 +1,5 @@
 <?php
+
 require('../connect.php');
 session_start();
 
@@ -236,7 +237,7 @@ $user_count = count(array_filter($users, fn($u) => $u['role'] === 'user'));
             <div class="user-form">
                 <h2><?= $edit_user ? 'Edit User' : 'Add New User' ?></h2>
                 
-                <form method="post" action="">
+                <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?><?= $edit_user ? '?edit=' . $edit_user['id'] : '' ?>">
                     <?php if($edit_user): ?>
                         <input type="hidden" name="id" value="<?= $edit_user['id'] ?>">
                     <?php endif; ?>
