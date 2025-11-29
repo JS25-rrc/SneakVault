@@ -1,18 +1,4 @@
 <?php
-/**
- * SneakVault CMS - Individual Sneaker Page
- * 
- * Displays detailed information about a single sneaker with comments.
- * 
- * Requirements Met:
- * - 2.7: Navigate pages (5%)
- * - 2.9: Comment on pages with one-to-many relationship (5%)
- * - 2.10: CAPTCHA verification for comments (5%)
- * - 4.2: Sanitize numeric IDs (1%)
- * - 4.3: Sanitize string inputs (1%)
- * - 6.4: Display images (2%)
- */
-
 require('connect.php');
 session_start();
 
@@ -211,20 +197,7 @@ if (isset($_GET['commented']) && $_GET['commented'] == '1') {
         }
         
         .comment-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 1rem;
-            color: var(--text-light);
-        }
-        
-        .comment-author {
-            font-weight: 600;
-            color: var(--primary-color);
-        }
-        
-        .comment-date {
-            font-size: 0.9rem;
-            font-style: italic;
+            font-size: 1rem;
         }
         
         @media (max-width: 768px) {
@@ -342,7 +315,7 @@ if (isset($_GET['commented']) && $_GET['commented'] == '1') {
                 <?php endif; ?>
                 
                 <!-- Comment Form -->
-                <form method="post" action="" class="comment-form">
+                <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>?id=<?= $id ?>" class="comment-form">
                     <h3>Leave a Comment</h3>
                     
                     <?php if(!isset($_SESSION['user_id'])): ?>
