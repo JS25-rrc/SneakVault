@@ -1,4 +1,5 @@
 <?php
+
 require('../connect.php');
 session_start();
 
@@ -156,8 +157,8 @@ function resize_image($file, $max_width, $max_height) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Sneaker - SneakVault Admin</title>
-    <link rel="stylesheet" href="../css/styles.css">
-    <script src="https://cdn.tiny.cloud/1/bwute7jbo1grqpzuyk18j59wptoo9ctgfd38gcw3apkb252h/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
     <script>
         tinymce.init({
             selector: '#description',
@@ -245,7 +246,7 @@ function resize_image($file, $max_width, $max_height) {
             </div>
         <?php endif; ?>
         
-        <form method="post" action="" enctype="multipart/form-data" class="admin-form">
+        <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>" enctype="multipart/form-data" class="admin-form">
             <div class="form-group">
                 <label for="name">Sneaker Name: <span class="required">*</span></label>
                 <input type="text" id="name" name="name" required 
@@ -309,7 +310,7 @@ function resize_image($file, $max_width, $max_height) {
             
             <div class="form-group">
                 <label for="description">Description: <span class="required">*</span></label>
-                <textarea id="description" name="description" rows="6" required><?= isset($_POST['description']) ? htmlspecialchars($_POST['description']) : '' ?></textarea>
+                <textarea id="description" name="description" rows="6"><?= isset($_POST['description']) ? htmlspecialchars($_POST['description']) : '' ?></textarea>
                 <small>Use the editor toolbar to format your text</small>
             </div>
             
